@@ -27,7 +27,6 @@ $$
 
 整体架构如下：
 
-```svg
 <svg width="1000" height="650" viewBox="0 0 1000 650"
      xmlns="http://www.w3.org/2000/svg">
 
@@ -103,7 +102,6 @@ $$
   <text class="small" x="205" y="385">Stack × L</text>
 
 </svg>
-```
 
 ### 2.1 Feature-Field Separated Cross Attention
 
