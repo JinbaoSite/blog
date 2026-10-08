@@ -53,63 +53,23 @@ $$
 
 ## 3. 端到端方案
 
-项目采用 **Polars + LightGBM** 构建完整流水线：
+项目采用 **Polars + LightGBM** 构建完整方案，整体分为五个阶段：
 
-```text
-原始 ZIP / Parquet
-        │
-        ▼
-Polars LazyFrame 流式扫描
-        │
-        ├── 标签与负样本构造
-        ├── 基础聚合特征
-        ├── 序列形状特征
-        ├── Target Encoding
-        ├── 用户画像与种子中心相似度
-        └── 用户-广告位图结构特征
-        │
-        ▼
-feat_<split>.parquet（96 维）
-        │
-        ▼
-LightGBM + 5-fold OOF 验证
-        │
-        ▼
-全量候选打分 → 排除当前种子 → Top-200K
-        │
-        ▼
-submission_test.json
-```
+1. 按时间窗口关联当前种子与下一窗口种子，构造正负样本并剔除已知人群；
+2. 对数千万候选用户进行流式扫描，依次生成基础聚合、序列形状、Target Encoding、用户画像和图结构特征；
+3. 将各阶段结果合并为统一的 96 维用户特征，确保训练、验证和预测口径一致；
+4. 使用 LightGBM 完成排序学习，并通过五折 OOF 与跨日 dev 集同时评估；
+5. 对测试候选池全量打分，排除当前种子后选取 Top-20 万作为最终扩展人群。
 
-代码结构保持得很克制：
-
-```text
-lookalike/
-├── paths.py            # 数据目录的单一来源
-├── build_features.py   # 七阶段特征工程与标签构造
-├── train.py            # LightGBM、五折验证和 dev 评估
-└── predict.py          # 全量打分与 Top-200K 提交
-```
-
-根目录的 `train.py` 和 `predict.py` 只是轻量入口，真正逻辑全部集中在包内，避免脚本之间复制代码和路径配置。
+这条链路的关键不是堆叠复杂模型，而是保证时间窗口、标签、特征和评估之间没有信息穿越，并让整个方案能够在数千万规模的数据上稳定执行。
 
 ## 4. 面向大规模数据的流式特征工程
 
 候选数据达到数千万行，并且包含多层 `list/struct` 嵌套字段。如果直接使用 Pandas 或一次性把完整 Parquet 物化到内存，很容易出现内存峰值过高甚至任务失败。
 
-项目统一使用：
+方案使用 Polars LazyFrame 进行延迟计算，只扫描当前阶段需要的列，并在结果落盘时采用 streaming 引擎。这样可以利用谓词下推、列裁剪和流式执行，避免把“数千万行 × 多层嵌套结构”整体载入内存。
 
-```python
-pl.scan_parquet(path)
-```
-
-构造 LazyFrame，只选择当前阶段需要的列，并在最终落盘时执行：
-
-```python
-lazy_frame.collect(engine="streaming")
-```
-
-这样 Polars 可以完成谓词下推、列裁剪和流式执行，避免把“数千万行 × 多层嵌套结构”整体载入内存。每个 split 最终只生成一个 `feat_<split>.parquet`，训练和推理共享同一份特征定义，减少中间文件和口径漂移。
+每个数据分区最终只保留一份统一特征文件，训练和推理共享同一套特征定义。这一设计减少了中间文件数量，也降低了多阶段特征口径不一致的风险。
 
 ## 5. 96 维特征体系
 
@@ -161,23 +121,9 @@ $$
 
 ## 6. 模型训练与可信评估
 
-最终模型使用 LightGBM 二分类目标：
+最终模型使用 LightGBM 二分类目标，并以 Average Precision 和 Binary LogLoss 作为训练监控指标。训练集由 9,208 个正样本和 100,000 个随机负样本构成，按照正负样本比例提高正样本权重，缓解类别极度不平衡的问题。
 
-```python
-params = {
-    "objective": "binary",
-    "metric": ["binary_logloss", "average_precision"],
-    "learning_rate": 0.05,
-    "num_leaves": 63,
-    "min_data_in_leaf": 500,
-    "feature_fraction": 0.85,
-    "bagging_fraction": 0.85,
-    "bagging_freq": 5,
-    "lambda_l2": 1.0,
-}
-```
-
-训练集由 9,208 个正样本和 100,000 个随机负样本构成，正样本权重约为 `neg/pos=10.9`。模型训练 400 轮，并使用五折 OOF PR-AUC 评估同分布泛化能力。
+模型采用较保守的树容量、叶节点最小样本约束、特征与样本随机采样以及 L2 正则化，训练 400 轮，并使用五折 OOF PR-AUC 评估同分布泛化能力。
 
 这里有一个重要经验：**in-sample 指标很高并不代表泛化能力强。** 早期大叶子数和更多迭代轮数可以让训练集指标接近满分，但随机特征也能被高容量树模型记忆。项目因此将 `num_leaves` 下调为 63、增加叶子最小样本数和 L2 正则，并把五折 OOF 指标作为可信依据。
 
@@ -212,14 +158,7 @@ params = {
 
 预测阶段加载测试特征和最终 LightGBM 模型，先排除当前窗口的已知种子用户，再对全量候选打分。
 
-选择 Top-20 万时没有对全部分数执行完整排序，而是使用：
-
-```python
-part = np.argpartition(-scores, TOPK - 1)[:TOPK]
-order = np.argsort(-scores[part], kind="mergesort")
-```
-
-`argpartition` 以近似 $O(n)$ 的代价找到 Top-K 集合，再只对 20 万条候选稳定排序，比直接排序数千万条记录更节省时间和内存。最终结果以流式方式写入 JSON，避免一次性构造大量 Python 字典。
+选择 Top-20 万时不对数千万条分数执行完整排序，而是先通过部分选择算法找出 Top-K 集合，再只对入选的 20 万条候选稳定排序。这种方案将主要选择过程控制在近似 $O(n)$ 的复杂度，比全量排序更节省时间和内存。最终提交结果采用流式写出，避免在内存中一次性构造全部记录。
 
 ## 9. 没有效果的尝试
 
@@ -233,32 +172,7 @@ order = np.argsort(-scores[part], kind="mergesort")
 
 这些实验说明，时序漂移场景下最危险的不是模型“不够复杂”，而是验证集上的微小提升无法跨时间泛化。与其持续扩大模型容量，不如优先检查样本构造、编码口径和跨日稳定性。
 
-## 10. 如何运行
-
-安装依赖后，按照 train、dev、test 的顺序构建特征：
-
-```bash
-python3 -m lookalike.build_features train
-python3 -m lookalike.build_features dev
-python3 -m lookalike.build_features test
-```
-
-先使用 train-only 模型获得可信的 dev 评估：
-
-```bash
-python3 train.py
-```
-
-最终提交时，将 dev 标签加入训练并生成测试集结果：
-
-```bash
-python3 train.py --include-dev
-python3 predict.py
-```
-
-输出文件为 `data/submissions/submission_test.json`，包含按分数降序排列的 20 万个候选用户。
-
-## 11. 项目总结
+## 10. 项目总结
 
 这个项目最有价值的地方，不只是训练了一个 LightGBM 模型，而是搭建了一条可复现、可扩展的大规模 Lookalike 流水线：
 
@@ -266,7 +180,7 @@ python3 predict.py
 2. 用 Polars LazyFrame 和 streaming 控制数千万行嵌套数据的内存占用；
 3. 用平滑 Target Encoding 将种子人群信息注入用户、平台、广告位和时段特征；
 4. 用五折 OOF、随机特征和打乱标签实验区分真实泛化与训练记忆；
-5. 用 `argpartition` 和流式 JSON 完成大规模 Top-K 推理输出；
+5. 用部分选择和流式输出完成大规模 Top-K 推理；
 6. 系统记录失败实验，避免用单日 CV 提升替代跨日业务收益。
 
 对于大规模营销人群拓展任务，可靠的数据与评估管线往往比盲目追求复杂模型更重要。只有先保证标签、特征、验证和推理口径一致，模型分数才真正具有业务意义。
