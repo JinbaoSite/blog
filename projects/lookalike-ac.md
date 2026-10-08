@@ -6,7 +6,7 @@
 
 这个项目来自“面向智能营销的目标客群拓展算法挑战赛”。给定某个历史窗口中的种子用户、候选用户及脱敏后的画像和行为特征，模型需要为候选用户生成排序分数，并选出 Top-20 万作为最终扩展人群。
 
-项目代码：[JinbaoSite/lookalike-ac](https://github.com/JinbaoSite/lookalike-ac)
+比赛地址：[面向智能营销的目标客群拓展（Lookalike）算法挑战赛](https://challenge.xfyun.cn/topic/info?type=Lookalike-AC)
 
 它并不是普通的二分类任务。真正的业务问题是：**在固定触达预算下，让有限的人群包覆盖尽可能多的未来高价值用户，同时保证命中效率。**
 
