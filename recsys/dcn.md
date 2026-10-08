@@ -16,7 +16,7 @@ DCN 针对这一问题引入 Cross Network，通过特定的交叉层结构自�
 
 DCN 的整体模型架构如下图所示。
 
-![DCN 模型架构图](img/dcn-figure1.svg)
+![DCN 模型架构图](../img/dcn-figure1.svg)
 
 > 图 1：原始 DCN 的并行结构示意图（依据原论文 [1] 重新绘制）。
 
