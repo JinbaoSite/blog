@@ -14,7 +14,7 @@ MMoE 针对这一问题，引入多个共享专家网络，并为每个任务设
 
 ### 2.1 整体网络结构
 
-![MMoE](https://cdn.jsdelivr.net/gh/JinbaoSite/jinbaosite.github.io@master/img/mmoe.png)
+![MMoE架构图](../img/mmoe-architecture.svg)
 
 MMoE 由三个核心部分组成：
 
