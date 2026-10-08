@@ -22,36 +22,9 @@ MMoE 由三个核心部分组成：
 - **Gate Network**：每个任务拥有独立的门控网络，控制各专家的贡献权重。
 - **Task Tower**：每个任务拥有独立的预测网络，输出对应任务的预测结果。
 
-以 CTR 和 CVR 两个任务为例，MMoE 的计算流程如下：
+输入特征首先送入多个共享 Expert，每个 Expert 学习一种潜在的特征变换方式；随后，不同任务通过各自的 Gate 对这些 Expert 的输出进行加权组合，从而形成任务特定的表示；最后，各任务将对应表示输入各自的 Tower，输出最终预测结果。
 
-```text
-                     Input Features
-                            │
-                ┌───────────┼───────────┐
-                │           │           │
-                ▼           ▼           ▼
-             Expert 1    Expert 2    Expert 3
-                │           │           │
-                └───────────┼───────────┘
-                            │
-                   Shared Experts
-                            │
-             ┌──────────────┴──────────────┐
-             │                             │
-             ▼                             ▼
-          CTR Gate                      CVR Gate
-             │                             │
-             ▼                             ▼
-      Weighted Sum                  Weighted Sum
-             │                             │
-             ▼                             ▼
-         CTR Tower                     CVR Tower
-             │                             │
-             ▼                             ▼
-          CTR Prediction              CVR Prediction
-```
-
-所有专家接收相同的输入特征，但具有独立的可学习参数。每个任务通过自己的 Gate 计算专家权重，并对专家输出进行加权求和，随后交给对应的 Tower 生成预测结果。
+这种结构的核心在于：共享 Expert 负责知识共享，独立 Gate 负责任务选择，独立 Tower 负责任务输出。因此，MMoE 能够在共享表示学习的基础上，更灵活地建模任务之间的相关性与差异性。
 
 ### 2.2 从 Shared-Bottom 到 MMoE
 
@@ -558,5 +531,3 @@ https://research.google/pubs/modeling-task-relationships-in-multi-task-learning-
 
 [5] PyTorch. **PyTorch Documentation**.  
 https://docs.pytorch.org/docs/stable/index.html
-- [3] [MMoE视频简介的youtube地址](https://www.youtube.com/watch?v=Dweg47Tswxw)
-- [4] [Modeling Task Relationships in Multi-task Learning with Multi-gate Mixture-of-Experts](https://dl.acm.org/doi/pdf/10.1145/3219819.3220007)
