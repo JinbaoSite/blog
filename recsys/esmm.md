@@ -39,7 +39,7 @@ $$
 根据条件概率的链式法则：
 
 $$
-\boxed{pCTCVR(x)=pCTR(x)\times pCVR(x)}
+pCTCVR(x)=pCTR(x)\times pCVR(x)
 $$
 
 其中，CTR 是曝光后点击概率，CVR 是**点击条件下**的转化概率，CTCVR 则是一次曝光最终同时发生点击和转化的概率。因此，不能直接把 `pCVR` 和 `pCTCVR` 当作同一种转化率。
@@ -122,7 +122,7 @@ $$
 总损失：
 
 $$
-\boxed{\mathcal{L}=\mathcal{L}_{CTR}+\mathcal{L}_{CTCVR}}
+\mathcal{L}=\mathcal{L}_{CTR}+\mathcal{L}_{CTCVR}
 $$
 
 其中 $N$ 为曝光样本数量。工程实现中也可以根据任务需求为两项损失设置权重，但这属于可选改动，而非上述原始目标函数的必要组成部分。
