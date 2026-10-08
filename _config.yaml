@@ -1,26 +1,25 @@
 title: Jinbao
 author: Jinbao
-description: 记录机器学习、深度学习、LLM、推荐算法与 Agent 的学习和实践
+description: 记录推荐算法、深度学习与工程项目的学习和实践
 logo: J
 base_url: /blog/
 posts_per_page: 5
 
 categories:
-  ml:
-    title: 机器学习
-    icon: ML
-  dl:
-    title: 深度学习
-    icon: DL
-  llm:
-    title: LLM
-    icon: LLM
   recsys:
     title: 推荐算法
     icon: RS
-  agent:
-    title: Agent
-    icon: AI
+  dl:
+    title: 深度学习
+    icon: DL
   projects:
     title: 项目
     icon: PX
+  agent:
+    title: Agent
+    icon: AI
+
+navigation:
+  - recsys
+  - dl
+  - projects
