@@ -22,7 +22,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v6
-      - uses: JinbaoSite/markdown-pages@v1
+      - uses: JinbaoSite/markdown-pages@44d012fa921f56c7f67735001c011b926de821c1 # Article table styles
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
