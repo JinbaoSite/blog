@@ -22,7 +22,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v6
-      - uses: JinbaoSite/markdown-pages@63a83378abe4ffd032586c5d8b4110750bbd4b26 # Match table font size to article text
+      - uses: JinbaoSite/markdown-pages@main
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
